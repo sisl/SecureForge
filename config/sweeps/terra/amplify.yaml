@@ -1,0 +1,15 @@
+# Terra Pipeline — Step 2: Amplify
+# MCMC amplification of Terra's generated scenarios.
+# Uses the same Semgrep protocol and defaults as the tunable sweeps.
+#
+# Usage:
+#   sf sweep amplify -r config/sweeps/terra/amplify.yaml
+
+defaults: []
+
+runs:
+  - name: gpt-5.6-terra
+    overrides:
+      - model=openai/gpt-5.6-terra
+      - input_file=./output/sweeps/generated_scenarios_gpt_5.6_terra_t1p0_n10_k10.jsonl
+    api_key_env: OPENAI_API_KEY
