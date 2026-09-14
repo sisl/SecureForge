@@ -1,0 +1,171 @@
+# CodeQL Prompt Baselines — Full Model Sweep
+# -----------------------------------------
+# Standard, secure, barebones, and Semgrep GEPA transfer baselines across
+# GPT-5.4 nano, GPT-5.4 mini, GPT-5.4, GPT-5.3 Codex, and GPT-5.6 Terra.
+# All runs use 10 scenarios x 10 rollouts per CWE under CodeQL.
+# Transfer runs reuse the source baseline's GPT-5.4 Semgrep-optimized GEPA
+# prompt across all models to measure cross-analyzer and cross-model transfer.
+#
+# Usage:
+#   sf sweep generate -r config/ablations/codeql_baselines_full.yaml
+
+defaults:
+  - min_samples=10
+  - num_rollouts=10
+  - analysis_tool=codeql
+
+runs:
+  # Baseline: standard coder prompt (from tunable.yaml).
+  - name: codeql-standard-gpt-5.4-nano
+    overrides:
+      - model=openai/gpt-5.4-nano
+      - output_dir=./output/ablations/codeql_baselines_full/standard/gpt-5.4-nano/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: standard coder prompt (from tunable.yaml).
+  - name: codeql-standard-gpt-5.4-mini
+    overrides:
+      - model=openai/gpt-5.4-mini
+      - output_dir=./output/ablations/codeql_baselines_full/standard/gpt-5.4-mini/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: standard coder prompt (from tunable.yaml).
+  - name: codeql-standard-gpt-5.4
+    overrides:
+      - model=openai/gpt-5.4
+      - output_dir=./output/ablations/codeql_baselines_full/standard/gpt-5.4/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: standard coder prompt (from tunable.yaml).
+  - name: codeql-standard-gpt-5.3-codex
+    overrides:
+      - model=openai/gpt-5.3-codex
+      - output_dir=./output/ablations/codeql_baselines_full/standard/gpt-5.3-codex/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: standard coder prompt (from tunable.yaml).
+  - name: codeql-standard-gpt-5.6-terra
+    overrides:
+      - model=openai/gpt-5.6-terra
+      - output_dir=./output/ablations/codeql_baselines_full/standard/gpt-5.6-terra/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: security-hardened coder prompt (from tunable_secure.yaml).
+  - name: codeql-secure-gpt-5.4-nano
+    overrides:
+      - model=openai/gpt-5.4-nano
+      - +secure=true
+      - output_dir=./output/ablations/codeql_baselines_full/secure/gpt-5.4-nano/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: security-hardened coder prompt (from tunable_secure.yaml).
+  - name: codeql-secure-gpt-5.4-mini
+    overrides:
+      - model=openai/gpt-5.4-mini
+      - +secure=true
+      - output_dir=./output/ablations/codeql_baselines_full/secure/gpt-5.4-mini/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: security-hardened coder prompt (from tunable_secure.yaml).
+  - name: codeql-secure-gpt-5.4
+    overrides:
+      - model=openai/gpt-5.4
+      - +secure=true
+      - output_dir=./output/ablations/codeql_baselines_full/secure/gpt-5.4/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: security-hardened coder prompt (from tunable_secure.yaml).
+  - name: codeql-secure-gpt-5.3-codex
+    overrides:
+      - model=openai/gpt-5.3-codex
+      - +secure=true
+      - output_dir=./output/ablations/codeql_baselines_full/secure/gpt-5.3-codex/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: security-hardened coder prompt (from tunable_secure.yaml).
+  - name: codeql-secure-gpt-5.6-terra
+    overrides:
+      - model=openai/gpt-5.6-terra
+      - +secure=true
+      - output_dir=./output/ablations/codeql_baselines_full/secure/gpt-5.6-terra/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: minimal coder prompt (from tunable_barebones.yaml).
+  - name: codeql-barebones-gpt-5.4-nano
+    overrides:
+      - model=openai/gpt-5.4-nano
+      - +barebones=true
+      - output_dir=./output/ablations/codeql_baselines_full/barebones/gpt-5.4-nano/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: minimal coder prompt (from tunable_barebones.yaml).
+  - name: codeql-barebones-gpt-5.4-mini
+    overrides:
+      - model=openai/gpt-5.4-mini
+      - +barebones=true
+      - output_dir=./output/ablations/codeql_baselines_full/barebones/gpt-5.4-mini/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: minimal coder prompt (from tunable_barebones.yaml).
+  - name: codeql-barebones-gpt-5.4
+    overrides:
+      - model=openai/gpt-5.4
+      - +barebones=true
+      - output_dir=./output/ablations/codeql_baselines_full/barebones/gpt-5.4/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: minimal coder prompt (from tunable_barebones.yaml).
+  - name: codeql-barebones-gpt-5.3-codex
+    overrides:
+      - model=openai/gpt-5.3-codex
+      - +barebones=true
+      - output_dir=./output/ablations/codeql_baselines_full/barebones/gpt-5.3-codex/
+    api_key_env: OPENAI_API_KEY
+
+  # Baseline: minimal coder prompt (from tunable_barebones.yaml).
+  - name: codeql-barebones-gpt-5.6-terra
+    overrides:
+      - model=openai/gpt-5.6-terra
+      - +barebones=true
+      - output_dir=./output/ablations/codeql_baselines_full/barebones/gpt-5.6-terra/
+    api_key_env: OPENAI_API_KEY
+
+  # Cross-baseline transfer: Semgrep-optimized GEPA prompt evaluated by CodeQL.
+  - name: codeql-semgrep-gepa-transfer-gpt-5.4-nano
+    overrides:
+      - model=openai/gpt-5.4-nano
+      - coder_prompt=./output/sweeps/optimize_gepa_gpt_5.4_t1p0.json
+      - output_dir=./output/ablations/codeql_baselines_full/semgrep_gepa_transfer/gpt-5.4-nano/
+    api_key_env: OPENAI_API_KEY
+
+  # Cross-baseline transfer: Semgrep-optimized GEPA prompt evaluated by CodeQL.
+  - name: codeql-semgrep-gepa-transfer-gpt-5.4-mini
+    overrides:
+      - model=openai/gpt-5.4-mini
+      - coder_prompt=./output/sweeps/optimize_gepa_gpt_5.4_t1p0.json
+      - output_dir=./output/ablations/codeql_baselines_full/semgrep_gepa_transfer/gpt-5.4-mini/
+    api_key_env: OPENAI_API_KEY
+
+  # Cross-baseline transfer: Semgrep-optimized GEPA prompt evaluated by CodeQL.
+  - name: codeql-semgrep-gepa-transfer-gpt-5.4
+    overrides:
+      - model=openai/gpt-5.4
+      - coder_prompt=./output/sweeps/optimize_gepa_gpt_5.4_t1p0.json
+      - output_dir=./output/ablations/codeql_baselines_full/semgrep_gepa_transfer/gpt-5.4/
+    api_key_env: OPENAI_API_KEY
+
+  # Cross-baseline transfer: Semgrep-optimized GEPA prompt evaluated by CodeQL.
+  - name: codeql-semgrep-gepa-transfer-gpt-5.3-codex
+    overrides:
+      - model=openai/gpt-5.3-codex
+      - coder_prompt=./output/sweeps/optimize_gepa_gpt_5.4_t1p0.json
+      - output_dir=./output/ablations/codeql_baselines_full/semgrep_gepa_transfer/gpt-5.3-codex/
+    api_key_env: OPENAI_API_KEY
+
+  # Cross-baseline transfer: Semgrep-optimized GEPA prompt evaluated by CodeQL.
+  - name: codeql-semgrep-gepa-transfer-gpt-5.6-terra
+    overrides:
+      - model=openai/gpt-5.6-terra
+      - coder_prompt=./output/sweeps/optimize_gepa_gpt_5.4_t1p0.json
+      - output_dir=./output/ablations/codeql_baselines_full/semgrep_gepa_transfer/gpt-5.6-terra/
+    api_key_env: OPENAI_API_KEY
