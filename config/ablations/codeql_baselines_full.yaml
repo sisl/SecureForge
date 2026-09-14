@@ -3,8 +3,8 @@
 # Standard, secure, barebones, and Semgrep GEPA transfer baselines across
 # GPT-5.4 nano, GPT-5.4 mini, GPT-5.4, GPT-5.3 Codex, and GPT-5.6 Terra.
 # All runs use 10 scenarios x 10 rollouts per CWE under CodeQL.
-# Transfer runs reuse the source baseline's GPT-5.4 Semgrep-optimized GEPA
-# prompt across all models to measure cross-analyzer and cross-model transfer.
+# Transfer runs use each model's own Semgrep-optimized GEPA prompt.
+# Terra transfer is disabled until its optimized prompt is available.
 #
 # Usage:
 #   sf sweep generate -r config/ablations/codeql_baselines_full.yaml
@@ -134,7 +134,7 @@ runs:
   - name: codeql-semgrep-gepa-transfer-gpt-5.4-nano
     overrides:
       - model=openai/gpt-5.4-nano
-      - coder_prompt=./output/sweeps/optimize_gepa_gpt_5.4_t1p0.json
+      - coder_prompt=./output/sweeps/optimize_gepa_gpt_5.4_nano_t1p0.json
       - output_dir=./output/ablations/codeql_baselines_full/semgrep_gepa_transfer/gpt-5.4-nano/
     api_key_env: OPENAI_API_KEY
 
@@ -142,7 +142,7 @@ runs:
   - name: codeql-semgrep-gepa-transfer-gpt-5.4-mini
     overrides:
       - model=openai/gpt-5.4-mini
-      - coder_prompt=./output/sweeps/optimize_gepa_gpt_5.4_t1p0.json
+      - coder_prompt=./output/sweeps/optimize_gepa_gpt_5.4_mini_t1p0.json
       - output_dir=./output/ablations/codeql_baselines_full/semgrep_gepa_transfer/gpt-5.4-mini/
     api_key_env: OPENAI_API_KEY
 
@@ -158,14 +158,15 @@ runs:
   - name: codeql-semgrep-gepa-transfer-gpt-5.3-codex
     overrides:
       - model=openai/gpt-5.3-codex
-      - coder_prompt=./output/sweeps/optimize_gepa_gpt_5.4_t1p0.json
+      - coder_prompt=./output/sweeps/optimize_gepa_gpt_5.3_codex_t1p0.json
       - output_dir=./output/ablations/codeql_baselines_full/semgrep_gepa_transfer/gpt-5.3-codex/
     api_key_env: OPENAI_API_KEY
 
-  # Cross-baseline transfer: Semgrep-optimized GEPA prompt evaluated by CodeQL.
-  - name: codeql-semgrep-gepa-transfer-gpt-5.6-terra
-    overrides:
-      - model=openai/gpt-5.6-terra
-      - coder_prompt=./output/sweeps/optimize_gepa_gpt_5.4_t1p0.json
-      - output_dir=./output/ablations/codeql_baselines_full/semgrep_gepa_transfer/gpt-5.6-terra/
-    api_key_env: OPENAI_API_KEY
+  # Disabled: Terra has not been optimized yet.
+  # # Cross-baseline transfer: Semgrep-optimized GEPA prompt evaluated by CodeQL.
+  # - name: codeql-semgrep-gepa-transfer-gpt-5.6-terra
+  #   overrides:
+  #     - model=openai/gpt-5.6-terra
+  #     - coder_prompt=./output/sweeps/optimize_gepa_gpt_5.6_terra_t1p0.json
+  #     - output_dir=./output/ablations/codeql_baselines_full/semgrep_gepa_transfer/gpt-5.6-terra/
+  #   api_key_env: OPENAI_API_KEY
