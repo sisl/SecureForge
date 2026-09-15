@@ -3,6 +3,7 @@ import json
 import typer
 import jsonlines
 import datetime
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from loguru import logger
@@ -17,6 +18,59 @@ from secureforge.config import GenerateConfig
 from secureforge.cli.common import is_data_record, read_config_record
 from secureforge.cli.utils import configure_logging, append_to_jsonl, get_model_config, get_environment_info, FailedPromptCallback
 from secureforge.cli.app import app
+
+def rescan_pending_rollouts(output_path: Path, config: GenerateConfig):
+    """Resume missing analysis results without regenerating code or tests."""
+    if not output_path.exists():
+        return
+
+    from secureforge.analyzers.evaluate import evaluate
+
+    with jsonlines.open(output_path) as reader:
+        records = list(reader)
+    selected_cwes = set(config.cwes or (CWE_TOP_25 if config.use_top_25 else []))
+    failures = 0
+    for record in records:
+        if not is_data_record(record) or record.get("cwe_id") not in selected_cwes:
+            continue
+        for scenario in record.get("scenarios", []):
+            pending = [r for r in scenario.get("rollouts", []) if "vulnerabilities" not in r]
+            if not pending:
+                continue
+            logger.info(f"Rescanning {len(pending)} saved rollouts for CWE-{record['cwe_id']}")
+
+            def scan(rollout):
+                try:
+                    return evaluate(rollout["code"], analysis_tool=config.analysis_tool,
+                                    language=config.language), None
+                except Exception as exc:
+                    return None, exc
+
+            with ThreadPoolExecutor(max_workers=config.num_rollouts) as executor:
+                for rollout, (findings, error) in zip(pending, executor.map(scan, pending)):
+                    if error is not None:
+                        failures += 1
+                        logger.error(f"Rescan failed; leaving result missing for retry: {error}")
+                    else:
+                        rollout["vulnerabilities"] = findings
+
+            # Checkpoint each scenario atomically, preserving all other records.
+            temporary_path = None
+            try:
+                with tempfile.NamedTemporaryFile(mode="w", dir=output_path.parent,
+                                                 encoding="utf-8", delete=False) as stream:
+                    temporary_path = Path(stream.name)
+                    for saved_record in records:
+                        stream.write(json.dumps(saved_record) + "\n")
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary_path, output_path)
+            finally:
+                if temporary_path is not None:
+                    temporary_path.unlink(missing_ok=True)
+
+    if failures:
+        raise RuntimeError(f"{failures} rollouts could not be rescanned; rerun to retry missing results")
 
 def load_completed_cwes(output_path: Path) -> Set[int]:
     """Load CWE IDs that have already been processed.
@@ -76,7 +130,7 @@ def build_record(
                         "code": r["code"],
                         "passes_tests": r["passes_tests"],
                         "test_details": r.get("test_details"),
-                        "vulnerabilities": r["vulnerabilities"],
+                        **({"vulnerabilities": r["vulnerabilities"]} if "vulnerabilities" in r else {}),
                     }
                     for r in sr["rollouts"]
                 ],
@@ -92,6 +146,59 @@ def generate_scenarios(config: GenerateConfig):
         "test_api_key": "***" if config.test_api_key else None,
     })
     logger.debug(f"Starting generation with config: {safe_config}")
+
+    # Construct output path
+    output_dir = Path(config.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    temperature_str = f't{config.temperature}'.replace('.', 'p')
+    if config.tk_checkpoint:
+        model_str = "tk_" + Path(config.tk_checkpoint).name.replace('-', '_')
+    elif config.checkpoint:
+        model_str = Path(config.checkpoint).name.replace('-', '_')
+    else:
+        model_str = config.model.split('/')[-1].replace('-', '_')
+    re_suffix = f"_re{config.reasoning_effort}" if config.reasoning_effort else ""
+    mode_suffix = "_secure" if config.secure else ("_barebones" if config.barebones else "")
+    output_filename = f"generated_scenarios_{model_str}_{temperature_str}_n{config.min_samples}_k{config.num_rollouts}{re_suffix}{mode_suffix}.jsonl"
+    output_path = output_dir / output_filename
+
+    logger.info(f"Output will be saved to: {output_path.absolute()}")
+
+    # Write config record as the first line for fresh files
+    if not output_path.exists():
+        config_record = {
+            "record_type": "config",
+            "timestamp": datetime.datetime.utcnow().isoformat() + 'Z',
+            "config": config.to_record(),
+            "environment": get_environment_info(),
+        }
+        with jsonlines.open(output_path, mode='a') as writer:
+            writer.write(config_record)
+        logger.info("Wrote config record to output file")
+
+    # Determine which CWEs to process
+    if config.cwes:
+        cwes_to_process = list(config.cwes)
+        logger.info(f"Processing {len(cwes_to_process)} specified CWEs")
+    elif config.use_top_25:
+        cwes_to_process = CWE_TOP_25
+        logger.info(f"Processing CWE Top 25 ({len(cwes_to_process)} CWEs)")
+    else:
+        logger.error("Must specify either --cwes or --use-top-25")
+        raise typer.Exit(code=1)
+
+    rescan_pending_rollouts(output_path, config)
+
+    # Load already-completed CWEs for idempotency
+    completed_cwes = load_completed_cwes(output_path)
+    cwes_to_process = [cwe for cwe in cwes_to_process if cwe not in completed_cwes]
+
+    if not cwes_to_process:
+        logger.info("All CWEs already completed!")
+        return
+
+    logger.info(f"Processing {len(cwes_to_process)} CWEs (skipped {len(completed_cwes)} already completed)")
 
     # Wire up debug log capture for failing LM prompts before any DSPy calls
     if config.debug_log:
@@ -164,57 +271,6 @@ def generate_scenarios(config: GenerateConfig):
         set_barebones(True)
         logger.info("Barebones-coder mode enabled: using minimal code-generation signature")
 
-    # Construct output path
-    output_dir = Path(config.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    temperature_str = f't{config.temperature}'.replace('.', 'p')
-    if config.tk_checkpoint:
-        model_str = "tk_" + Path(config.tk_checkpoint).name.replace('-', '_')
-    elif config.checkpoint:
-        model_str = Path(config.checkpoint).name.replace('-', '_')
-    else:
-        model_str = config.model.split('/')[-1].replace('-', '_')
-    re_suffix = f"_re{config.reasoning_effort}" if config.reasoning_effort else ""
-    mode_suffix = "_secure" if config.secure else ("_barebones" if config.barebones else "")
-    output_filename = f"generated_scenarios_{model_str}_{temperature_str}_n{config.min_samples}_k{config.num_rollouts}{re_suffix}{mode_suffix}.jsonl"
-    output_path = output_dir / output_filename
-
-    logger.info(f"Output will be saved to: {output_path.absolute()}")
-
-    # Write config record as the first line for fresh files
-    if not output_path.exists():
-        config_record = {
-            "record_type": "config",
-            "timestamp": datetime.datetime.utcnow().isoformat() + 'Z',
-            "config": config.to_record(),
-            "environment": get_environment_info(),
-        }
-        with jsonlines.open(output_path, mode='a') as writer:
-            writer.write(config_record)
-        logger.info("Wrote config record to output file")
-
-    # Determine which CWEs to process
-    if config.cwes:
-        cwes_to_process = list(config.cwes)
-        logger.info(f"Processing {len(cwes_to_process)} specified CWEs")
-    elif config.use_top_25:
-        cwes_to_process = CWE_TOP_25
-        logger.info(f"Processing CWE Top 25 ({len(cwes_to_process)} CWEs)")
-    else:
-        logger.error("Must specify either --cwes or --use-top-25")
-        raise typer.Exit(code=1)
-
-    # Load already-completed CWEs for idempotency
-    completed_cwes = load_completed_cwes(output_path)
-    cwes_to_process = [cwe for cwe in cwes_to_process if cwe not in completed_cwes]
-
-    if not cwes_to_process:
-        logger.info("All CWEs already completed!")
-        return
-
-    logger.info(f"Processing {len(cwes_to_process)} CWEs (skipped {len(completed_cwes)} already completed)")
-
     # Initialize CWE database
     db = Database()
 
@@ -286,18 +342,17 @@ def generate_scenarios(config: GenerateConfig):
                                 "results": test_result["test_results"],
                             }
 
-                        vulnerabilities = []
-                        try:
-                            vulnerabilities = evaluate(code, analysis_tool=config.analysis_tool, language=config.language)
-                        except Exception as e:
-                            logger.warning(f"    Evaluation failed: {e}")
-
-                        return {
+                        rollout = {
                             "code": code,
                             "passes_tests": passes_tests,
                             "test_details": test_details,
-                            "vulnerabilities": vulnerabilities,
                         }
+                        try:
+                            rollout["vulnerabilities"] = evaluate(code, analysis_tool=config.analysis_tool, language=config.language)
+                        except Exception as e:
+                            logger.warning(f"    Evaluation failed: {e}")
+
+                        return rollout
 
                     with ThreadPoolExecutor(max_workers=config.num_rollouts) as executor:
                         rollouts = list(executor.map(_process_rollout, codes))
@@ -306,9 +361,9 @@ def generate_scenarios(config: GenerateConfig):
                     for rollout in rollouts:
                         if rollout["passes_tests"] is True:
                             cwe_rollouts_passing += 1
-                        if len(rollout["vulnerabilities"]) > 0:
+                        if rollout.get("vulnerabilities"):
                             cwe_rollouts_with_vulns += 1
-                        cwe_vulns += len(rollout["vulnerabilities"])
+                        cwe_vulns += len(rollout.get("vulnerabilities", []))
 
                     cwe_rollouts += len(rollouts)
 
