@@ -1,0 +1,27 @@
+# Red-team cross-analyzer sweep — GEPA-optimized GPT-5.4, 100 IID samples
+# -------------------------------------------------------------------
+# Runs Kimi and Codex Security over the same seeded sample from all rollouts
+# generated with the GEPA-optimized GPT-5.4 prompt. Results are kept in
+# separate files under ./output/sweeps/redteam_cross_analyzers_ours/.
+#
+# Run with:
+#   sf sweep redteam -r config/sweeps/redteam_cross_analyzers_ours.yaml
+
+runs:
+  - name: redteam-kimi
+    overrides:
+      - input_file=./output/sweeps/gepa/generated_scenarios_gpt_5.4_t1p0_n10_k10.jsonl
+      - output=./output/sweeps/redteam_cross_analyzers_ours/kimi.jsonl
+      - analyzer=kimi
+      - all_samples=true
+      - limit=100
+      - seed=0
+
+  - name: redteam-gptsecurity
+    overrides:
+      - input_file=./output/sweeps/gepa/generated_scenarios_gpt_5.4_t1p0_n10_k10.jsonl
+      - output=./output/sweeps/redteam_cross_analyzers_ours/gptsecurity.jsonl
+      - analyzer=codex-security
+      - all_samples=true
+      - limit=100
+      - seed=0
